@@ -4,39 +4,40 @@
 # Faz pull da nova imagem, reinicia o serviço e valida o health check.
 # Em caso de falha, reverte para a imagem anterior automaticamente.
 
-
 set -euo pipefail
-
 
 DEPLOY_PATH="${DEPLOY_PATH:-~/yolo-edge-api}"
 HEALTH_URL="http://localhost:8000/health"
 HEALTH_RETRIES=6
 HEALTH_WAIT=10
 
-
 echo "========================================"
 echo " Deploy — $(date '+%Y-%m-%d %H:%M:%S')"
 echo "========================================"
 
-
 cd "$DEPLOY_PATH"
-
 
 # ── Salva a imagem atual para possível rollback ──────────────
 PREVIOUS=$(docker inspect yolo-api \
     --format '{{.Config.Image}}' 2>/dev/null || echo "none")
 echo "[INFO] Imagem atual: $PREVIOUS"
 
-
 # ── Baixa a nova imagem ──────────────────────────────────────
 echo "[1/4] Baixando nova imagem..."
 docker compose pull
 
+# ── Limpa containers antigos ────────────────────────────────
+echo "[2/4] Parando e removendo containers antigos..."
+docker compose down --remove-orphans
+
+# Remove qualquer container órfão que possa estar causando conflito
+echo "[2/4] Removendo containers órfãos..."
+docker rm -f yolo-api 2>/dev/null || true
+docker rm -f yolo-client 2>/dev/null || true
 
 # ── Sobe a nova versão ───────────────────────────────────────
 echo "[2/4] Iniciando nova versão..."
 docker compose up -d
-
 
 # ── Aguarda o serviço estabilizar ────────────────────────────
 echo "[3/4] Aguardando health check ($((HEALTH_RETRIES * HEALTH_WAIT))s max)..."
@@ -49,7 +50,6 @@ for i in $(seq 1 $HEALTH_RETRIES); do
     fi
     echo "  Tentativa $i/$HEALTH_RETRIES falhou, aguardando..."
 done
-
 
 # ── Avalia o resultado ───────────────────────────────────────
 if [ "$SUCCESS" = true ]; then
