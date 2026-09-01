@@ -25,10 +25,11 @@ echo "[INFO] Imagem atual: $PREVIOUS"
 # ── Baixa a nova imagem ──────────────────────────────────────
 echo "[1/4] Baixando nova imagem..."
 docker compose pull
-
+python3 -m dvc pull models/yolo-epi.pt
 # ── Limpa containers antigos ────────────────────────────────
-echo "[2/4] Parando e removendo containers antigos..."
-docker compose down --remove-orphans
+echo "[2/4] Iniciando nova versão..."
+docker compose up -d --build
+
 
 # Remove qualquer container órfão que possa estar causando conflito
 echo "[2/4] Removendo containers órfãos..."
